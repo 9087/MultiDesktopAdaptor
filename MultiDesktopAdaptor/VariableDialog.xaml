@@ -1,0 +1,47 @@
+<ui:ContentDialog x:Class="MultiDesktopAdaptor.VariableDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        Title="Add Variable"
+        PrimaryButtonText="Save"
+        SecondaryButtonText="Cancel"
+        DefaultButton="Primary">
+    <Grid Width="420" Margin="0,8,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MaxHeight="240" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Variable Name" Margin="0,0,0,4" />
+        <TextBox x:Name="NameTextBox" Grid.Row="1" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="2" Text="Default Value (fallback)" Margin="0,0,0,4" />
+        <TextBox x:Name="DefaultValueTextBox" Grid.Row="3" Margin="0,0,0,12" />
+
+        <TextBlock x:Name="ValidationErrorText" Grid.Row="4"
+                   Foreground="Red" Visibility="Collapsed"
+                   Margin="0,0,0,8" />
+
+        <TextBlock Grid.Row="5" Text="Per-desktop values:" Margin="0,0,0,4" />
+        <ItemsControl x:Name="DesktopValuesList" Grid.Row="6">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding DesktopName}"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</ui:ContentDialog>

@@ -1,0 +1,5 @@
+/.vs
+/MultiDesktopAdaptor/bin
+/MultiDesktopAdaptor/obj
+/_ReSharper.Caches
+*.user
