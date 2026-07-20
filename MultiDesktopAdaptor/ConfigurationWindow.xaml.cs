@@ -1,5 +1,4 @@
 ﻿using System.Collections.ObjectModel;
-using System.Threading.Tasks;
 using System.Windows;
 using ModernWpf.Controls;
 using MultiDesktopAdaptor.Models;
@@ -10,14 +9,12 @@ public partial class ConfigurationWindow : Window
 {
     public ObservableCollection<WindowRule> Rules { get; } = new();
     public ObservableCollection<CommandDefinition> Commands { get; } = new();
-    public ObservableCollection<VariableDefinition> Variables { get; } = new();
 
     public ConfigurationWindow()
     {
         InitializeComponent();
         RuleListView.ItemsSource = Rules;
         CommandListView.ItemsSource = Commands;
-        VariableListView.ItemsSource = Variables;
     }
 
     public void LoadConfiguration(AppConfiguration config)
@@ -27,16 +24,12 @@ public partial class ConfigurationWindow : Window
 
         Commands.Clear();
         foreach (var c in config.Commands) Commands.Add(c);
-
-        Variables.Clear();
-        foreach (var v in config.Variables) Variables.Add(v);
     }
 
     public void SaveConfiguration(AppConfiguration config)
     {
         config.FollowRules = Rules.ToList();
         config.Commands = Commands.ToList();
-        config.Variables = Variables.ToList();
     }
 
     private async void OnAddRuleClick(object sender, RoutedEventArgs e)
@@ -91,32 +84,5 @@ public partial class ConfigurationWindow : Window
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary && dialog.Result != null)
             Commands[index] = dialog.Result;
-    }
-
-    private async void OnAddVariableClick(object sender, RoutedEventArgs e)
-    {
-        var dialog = new VariableDialog();
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && dialog.Result != null)
-            Variables.Add(dialog.Result);
-    }
-
-    private void OnRemoveVariableClick(object sender, RoutedEventArgs e)
-    {
-        if (VariableListView.SelectedItem is VariableDefinition variable)
-            Variables.Remove(variable);
-    }
-
-    private async void OnVariableDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        if (VariableListView.SelectedItem is not VariableDefinition variable)
-            return;
-
-        var index = Variables.IndexOf(variable);
-        var dialog = new VariableDialog();
-        dialog.LoadExisting(variable);
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && dialog.Result != null)
-            Variables[index] = dialog.Result;
     }
 }

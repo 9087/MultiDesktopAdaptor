@@ -6,24 +6,43 @@
         PrimaryButtonText="Save"
         SecondaryButtonText="Cancel"
         DefaultButton="Primary">
-    <Grid Width="420" Margin="0,8,0,0">
+    <Grid Width="480" Margin="0,8,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MaxHeight="240" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Title (optional, shown in menu)" Margin="0,0,0,4" />
-        <TextBox x:Name="TitleTextBox" Grid.Row="1" Margin="0,0,0,12" />
+        <TextBlock Grid.Row="0" Text="Title (shown in tray menu)" Margin="0,0,0,4" />
+        <TextBox x:Name="TitleTextBox" Grid.Row="1" HorizontalAlignment="Stretch" Margin="0,0,0,12" />
 
-        <TextBlock Grid.Row="2" Text="Command Line (use $VarName for variables)" Margin="0,0,0,4" />
-        <TextBox x:Name="CommandLineTextBox" Grid.Row="3"
-                 AcceptsReturn="True" Height="60" />
-
-        <TextBlock x:Name="ValidationErrorText" Grid.Row="4"
+        <TextBlock x:Name="ValidationErrorText" Grid.Row="2"
                    Foreground="Red" Visibility="Collapsed"
-                   Margin="0,6,0,0" />
+                   Margin="0,0,0,8" />
+
+        <TextBlock Grid.Row="3" Text="Per-desktop command lines (absolute paths required):"
+                   Margin="0,0,0,4" />
+        <ItemsControl x:Name="DesktopCommandsList" Grid.Row="4"
+                      HorizontalContentAlignment="Stretch"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding DesktopName}"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 HorizontalAlignment="Stretch"
+                                 Text="{Binding CommandLine, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </ui:ContentDialog>

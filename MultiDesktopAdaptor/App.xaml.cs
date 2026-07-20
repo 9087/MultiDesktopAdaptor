@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -39,7 +40,7 @@ public partial class App : Application
         RebuildTrayMenu();
     }
 
-    private void RebuildTrayMenu(List<(Process process, string title)>? mismatched = null)
+    private void RebuildTrayMenu(List<(string processName, string title)>? mismatched = null)
     {
         if (_trayIcon?.ContextMenu == null)
             return;
@@ -53,41 +54,40 @@ public partial class App : Application
             Command = new RelayCommand(ShowConfigurationWindow)
         });
 
-        // Commands submenu
+        // Commands submenu — only show commands configured for this desktop
         if (_configuration.Commands.Count > 0)
         {
-            var commandsMenu = new System.Windows.Controls.MenuItem { Header = "Commands" };
-            foreach (var cmd in _configuration.Commands)
+            var currentDesktopId = VirtualDesktop.Current.Id;
+            var visibleCommands = _configuration.Commands
+                .Where(c => c.DesktopCommands.TryGetValue(currentDesktopId, out var line)
+                            && !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            if (visibleCommands.Count > 0)
             {
-                var label = string.IsNullOrWhiteSpace(cmd.Title) ? cmd.CommandLine : cmd.Title;
-                var item = new System.Windows.Controls.MenuItem { Header = label };
-                item.Click += (_, _) => ExecuteCommand(cmd);
-                commandsMenu.Items.Add(item);
+                var commandsMenu = new System.Windows.Controls.MenuItem { Header = "Commands" };
+                foreach (var cmd in visibleCommands)
+                {
+                    var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
+                    var item = new System.Windows.Controls.MenuItem { Header = label };
+                    item.Click += (_, _) => ExecuteCommand(cmd);
+                    commandsMenu.Items.Add(item);
+                }
+                menu.Items.Add(commandsMenu);
             }
-            menu.Items.Add(commandsMenu);
         }
 
-        // Mismatched processes (data pre-computed on background thread)
+        // Mismatched processes — display only, no kill action
         if (mismatched is { Count: > 0 })
         {
             var mismatchedMenu = new System.Windows.Controls.MenuItem { Header = "Mismatched" };
-            foreach (var (process, title) in mismatched)
+            foreach (var (processName, title) in mismatched)
             {
-                var item = new System.Windows.Controls.MenuItem
+                mismatchedMenu.Items.Add(new System.Windows.Controls.MenuItem
                 {
-                    Header = $"{process.ProcessName} — {title}",
-                    Tag = process
-                };
-                item.Click += (_, e) =>
-                {
-                    try
-                    {
-                        if (e.Source is System.Windows.Controls.MenuItem mi && mi.Tag is Process proc)
-                            proc.Kill();
-                    }
-                    catch { }
-                };
-                mismatchedMenu.Items.Add(item);
+                    Header = $"{processName} — {title}",
+                    IsEnabled = false
+                });
             }
             menu.Items.Add(mismatchedMenu);
         }
@@ -185,53 +185,32 @@ public partial class App : Application
         }, token);
     }
 
-    #region Command execution & variables
+    #region Command execution
 
     /// <summary>
-    /// Resolves a variable's value for the current desktop.
-    /// Desktop-specific value takes priority; falls back to default.
-    /// </summary>
-    private static string ResolveVariable(VariableDefinition variable)
-    {
-        var desktopId = VirtualDesktop.Current.Id;
-        if (variable.DesktopValues.TryGetValue(desktopId, out var desktopValue) && !string.IsNullOrWhiteSpace(desktopValue))
-            return desktopValue;
-        return variable.DefaultValue;
-    }
-
-    /// <summary>
-    /// Replaces $VarName tokens in a command line with resolved variable values.
-    /// </summary>
-    private string ResolveCommandLine(CommandDefinition command)
-    {
-        var result = command.CommandLine;
-        foreach (var variable in _configuration.Variables)
-        {
-            result = result.Replace($"${variable.Name}", ResolveVariable(variable), StringComparison.OrdinalIgnoreCase);
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Executes a command with variables resolved for the current desktop.
+    /// Executes the per-desktop command line for the current virtual desktop.
+    /// The command line must be an absolute path; arguments are case-sensitive.
     /// </summary>
     public void ExecuteCommand(CommandDefinition command)
     {
-        var resolved = ResolveCommandLine(command);
-        if (string.IsNullOrWhiteSpace(resolved))
+        var desktopId = VirtualDesktop.Current.Id;
+        if (!command.DesktopCommands.TryGetValue(desktopId, out var commandLine)
+            || string.IsNullOrWhiteSpace(commandLine))
+        {
+            Logger.Info($"[ExecuteCommand] No command for desktop {desktopId}");
             return;
+        }
 
         try
         {
-            var process = Process.Start(new ProcessStartInfo
+            Logger.Info($"[ExecuteCommand] Launching: {commandLine}");
+            Process.Start(new ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = $"/c \"{resolved}\"",
+                Arguments = $"/c \"{commandLine}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             });
-            if (process != null)
-                _commandProcesses.Add(process);
         }
         catch (Exception ex)
         {
@@ -239,47 +218,110 @@ public partial class App : Application
         }
     }
 
-    private readonly List<Process> _commandProcesses = new();
-
     /// <summary>
-    /// Returns command-launched processes whose main window is NOT on the current desktop.
+    /// Scans all visible windows and finds processes whose command line matches
+    /// a command configured for a DIFFERENT desktop than where the window is.
     /// </summary>
-    private List<(Process process, string title)> GetMismatchedProcesses()
+    private List<(string processName, string title)> GetMismatchedProcesses()
     {
-        var result = new List<(Process, string)>();
+        var result = new List<(string, string)>();
         var currentDesktop = VirtualDesktop.Current;
-        var dead = new List<Process>();
-
-        long refreshMs = 0, comMs = 0;
         var sw = Stopwatch.StartNew();
 
-        foreach (var proc in _commandProcesses)
+        // Build lookup: normalized exe path → configured desktop ID
+        var commandTargets = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cmd in _configuration.Commands)
         {
-            try
+            foreach (var (desktopId, commandLine) in cmd.DesktopCommands)
             {
-                if (proc.HasExited) { dead.Add(proc); continue; }
-
-                var rSw = Stopwatch.StartNew();
-                proc.Refresh();
-                refreshMs += rSw.ElapsedMilliseconds;
-
-                var hwnd = proc.MainWindowHandle;
-                if (hwnd == IntPtr.Zero) continue;
-
-                var cSw = Stopwatch.StartNew();
-                var desktop = VirtualDesktop.FromHwnd(hwnd);
-                comMs += cSw.ElapsedMilliseconds;
-
-                if (desktop?.Id != currentDesktop.Id)
-                    result.Add((proc, proc.MainWindowTitle));
+                if (string.IsNullOrWhiteSpace(commandLine))
+                    continue;
+                var exePath = NormalizeExePath(ExtractExePath(commandLine));
+                if (exePath.Length > 0)
+                {
+                    commandTargets[exePath] = desktopId;
+                    Logger.Info($"[Mismatched] target: {exePath} → desktop {desktopId}");
+                }
             }
-            catch { dead.Add(proc); }
         }
 
-        foreach (var d in dead) _commandProcesses.Remove(d);
+        if (commandTargets.Count == 0)
+            return result;
 
-        Logger.Info($"[Mismatched] processes={_commandProcesses.Count} mismatched={result.Count} refresh={refreshMs}ms com={comMs}ms total={sw.ElapsedMilliseconds}ms");
+        var checkedCount = 0;
+        EnumWindows((hwnd, _) =>
+        {
+            if (!IsWindowVisible(hwnd))
+                return true;
+
+            GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid == 0) return true;
+
+            try
+            {
+                using var proc = Process.GetProcessById((int)pid);
+                var exePath = NormalizeExePath(proc.MainModule?.FileName ?? "");
+                if (exePath.Length == 0) return true;
+
+                if (commandTargets.TryGetValue(exePath, out var targetDesktopId))
+                {
+                    checkedCount++;
+                    var winDesktop = VirtualDesktop.FromHwnd(hwnd);
+                    var winDesktopId = winDesktop?.Id;
+                    if (winDesktopId != targetDesktopId && winDesktopId != null)
+                    {
+                        var title = GetWindowText(hwnd);
+                        result.Add((proc.ProcessName, title));
+                        Logger.Info($"[Mismatched] HIT: {proc.ProcessName} '{title}' on desktop {winDesktopId}, should be {targetDesktopId}");
+                    }
+                    else
+                    {
+                        Logger.Info($"[Mismatched] OK: {proc.ProcessName} '{GetWindowText(hwnd)}' on correct desktop {winDesktopId}");
+                    }
+                }
+            }
+            catch (Exception ex) { Logger.Info($"[Mismatched] error for PID {pid}: {ex.Message}"); }
+
+            return true;
+        }, IntPtr.Zero);
+
+        Logger.Info($"[Mismatched] scanned={commandTargets.Count} targets mismatched={result.Count} | {sw.ElapsedMilliseconds}ms");
         return result;
+    }
+
+    /// <summary>Extracts the executable path from a command line by finding the longest prefix that exists as a file.</summary>
+    private static string ExtractExePath(string commandLine)
+    {
+        commandLine = commandLine.Trim();
+        if (commandLine.StartsWith('"'))
+        {
+            var end = commandLine.IndexOf('"', 1);
+            return end > 0 ? commandLine[1..end] : commandLine[1..];
+        }
+
+        // Try progressively longer prefixes to handle paths with spaces (e.g. C:\Program Files\...)
+        var parts = commandLine.Split(' ');
+        for (int i = parts.Length; i >= 1; i--)
+        {
+            var candidate = string.Join(" ", parts.Take(i));
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        // Fallback: return first token
+        var space = commandLine.IndexOf(' ');
+        return space > 0 ? commandLine[..space] : commandLine;
+    }
+
+    private static string NormalizeExePath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return "";
+        try
+        {
+            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch { return path; }
     }
 
     #endregion

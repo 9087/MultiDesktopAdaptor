@@ -55,37 +55,14 @@
                             <GridView>
                                 <GridViewColumn Header="Title" Width="150"
                                                 DisplayMemberBinding="{Binding Title}" />
-                                <GridViewColumn Header="Command" Width="350"
-                                                DisplayMemberBinding="{Binding CommandLine}" />
+                                <GridViewColumn Header="Desktops configured" Width="200"
+                                                DisplayMemberBinding="{Binding DesktopCommands.Count}" />
                             </GridView>
                         </ListView.View>
                     </ListView>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
                         <Button Content="+ Add Command" Click="OnAddCommandClick" />
                         <Button Content="Remove" Click="OnRemoveCommandClick" Margin="8,0,0,0" />
-                    </StackPanel>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Variables">
-                <Grid Margin="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <ListView x:Name="VariableListView" MouseDoubleClick="OnVariableDoubleClick">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="Name" Width="120"
-                                                DisplayMemberBinding="{Binding Name}" />
-                                <GridViewColumn Header="Default" Width="200"
-                                                DisplayMemberBinding="{Binding DefaultValue}" />
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button Content="+ Add Variable" Click="OnAddVariableClick" />
-                        <Button Content="Remove" Click="OnRemoveVariableClick" Margin="8,0,0,0" />
                     </StackPanel>
                 </Grid>
             </TabItem>
