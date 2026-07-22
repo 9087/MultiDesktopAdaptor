@@ -14,7 +14,6 @@ public partial class ConfigurationWindow : Window
     public ObservableCollection<WindowRule> Rules { get; } = new();
     public ObservableCollection<CommandDefinition> Commands { get; } = new();
 
-    private System.Guid _selectedDesktopId;
     private readonly List<VirtualDesktop> _desktops = new();
 
     public ConfigurationWindow()
@@ -22,17 +21,9 @@ public partial class ConfigurationWindow : Window
         InitializeComponent();
         RuleListView.ItemsSource = Rules;
 
-        // Populate desktop list
         try
         {
             _desktops.AddRange(VirtualDesktop.GetDesktops());
-            foreach (var d in _desktops)
-                DesktopSelector.Items.Add(new ListBoxItem { Content = d.Name, Tag = d });
-            if (_desktops.Count > 0)
-            {
-                DesktopSelector.SelectedIndex = 0;
-                _selectedDesktopId = _desktops[0].Id;
-            }
         }
         catch { }
     }
@@ -45,7 +36,7 @@ public partial class ConfigurationWindow : Window
         Commands.Clear();
         foreach (var c in config.Commands) Commands.Add(c);
 
-        RebuildCommandList();
+        RebuildCommandSelector();
     }
 
     public void SaveConfiguration(AppConfiguration config)
@@ -54,35 +45,46 @@ public partial class ConfigurationWindow : Window
         config.Commands = Commands.ToList();
     }
 
-    private void OnDesktopSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void RebuildCommandSelector()
     {
-        if (DesktopSelector.SelectedItem is ListBoxItem item && item.Tag is VirtualDesktop desktop)
-        {
-            _selectedDesktopId = desktop.Id;
-            RebuildCommandList();
-        }
-    }
-
-    private void RebuildCommandList()
-    {
-        var rows = new List<CommandRow>();
-
+        CommandSelector.Items.Clear();
         foreach (var cmd in Commands)
         {
-            var hasConfig = cmd.DesktopCommands.TryGetValue(_selectedDesktopId, out var dc)
-                            && !string.IsNullOrWhiteSpace(dc.CommandLine);
+            var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
+            CommandSelector.Items.Add(new ListBoxItem { Content = label, Tag = cmd });
+        }
+        if (CommandSelector.Items.Count > 0)
+            CommandSelector.SelectedIndex = 0;
+        else
+            DesktopDetailView.ItemsSource = null;
+    }
 
-            rows.Add(new CommandRow
+    private void OnCommandSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CommandSelector.SelectedItem is not ListBoxItem item || item.Tag is not CommandDefinition cmd)
+        {
+            DesktopDetailView.ItemsSource = null;
+            return;
+        }
+        ShowCommandDetail(cmd);
+    }
+
+    private void ShowCommandDetail(CommandDefinition cmd)
+    {
+        var rows = new List<DesktopDetailRow>();
+        foreach (var desktop in _desktops)
+        {
+            var hasConfig = cmd.DesktopCommands.TryGetValue(desktop.Id, out var dc)
+                            && !string.IsNullOrWhiteSpace(dc.CommandLine);
+            rows.Add(new DesktopDetailRow
             {
-                Title = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title,
-                CommandLine = hasConfig ? dc!.CommandLine : "(not configured)",
+                DesktopName = desktop.Name,
+                CommandLine = hasConfig ? dc!.CommandLine : "",
                 WorkingDirectory = hasConfig ? dc!.WorkingDirectory : "",
-                ShowWindowText = hasConfig && dc!.ShowWindow ? "Yes" : "",
-                ParentCommand = cmd
+                ShowWindowText = hasConfig && dc!.ShowWindow ? "Yes" : ""
             });
         }
-
-        CommandListView.ItemsSource = rows;
+        DesktopDetailView.ItemsSource = rows;
     }
 
     private async void OnAddRuleClick(object sender, RoutedEventArgs e)
@@ -119,24 +121,20 @@ public partial class ConfigurationWindow : Window
         if (result == ContentDialogResult.Primary && dialog.Result != null)
         {
             Commands.Add(dialog.Result);
-            RebuildCommandList();
+            RebuildCommandSelector();
         }
     }
 
-    private void OnRemoveCommandClick(object sender, RoutedEventArgs e)
+    private void OnEditCommandClick(object sender, RoutedEventArgs e)
     {
-        if (CommandListView.SelectedItem is CommandRow row && row.ParentCommand is CommandDefinition cmd)
+        if (CommandSelector.SelectedItem is ListBoxItem item && item.Tag is CommandDefinition cmd)
         {
-            Commands.Remove(cmd);
-            RebuildCommandList();
+            _ = EditCommandAsync(cmd);
         }
     }
 
-    private async void OnCommandDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private async System.Threading.Tasks.Task EditCommandAsync(CommandDefinition cmd)
     {
-        if (CommandListView.SelectedItem is not CommandRow row || row.ParentCommand is not CommandDefinition cmd)
-            return;
-
         var index = Commands.IndexOf(cmd);
         if (index < 0) return;
 
@@ -146,16 +144,24 @@ public partial class ConfigurationWindow : Window
         if (result == ContentDialogResult.Primary && dialog.Result != null)
         {
             Commands[index] = dialog.Result;
-            RebuildCommandList();
+            RebuildCommandSelector();
+        }
+    }
+
+    private void OnRemoveCommandClick(object sender, RoutedEventArgs e)
+    {
+        if (CommandSelector.SelectedItem is ListBoxItem item && item.Tag is CommandDefinition cmd)
+        {
+            Commands.Remove(cmd);
+            RebuildCommandSelector();
         }
     }
 }
 
-public class CommandRow
+public class DesktopDetailRow
 {
-    public string Title { get; set; } = "";
+    public string DesktopName { get; set; } = "";
     public string CommandLine { get; set; } = "";
     public string WorkingDirectory { get; set; } = "";
     public string ShowWindowText { get; set; } = "";
-    public CommandDefinition? ParentCommand { get; set; }
 }

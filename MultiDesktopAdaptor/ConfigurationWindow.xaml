@@ -46,7 +46,7 @@
             <TabItem Header="Commands">
                 <Grid Margin="12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1*" MinWidth="120" />
+                        <ColumnDefinition Width="1*" MinWidth="140" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="3*" />
                     </Grid.ColumnDefinitions>
@@ -55,24 +55,24 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Left: desktop selector -->
-                    <ListBox x:Name="DesktopSelector" Grid.Column="0"
-                             SelectionChanged="OnDesktopSelectionChanged" />
+                    <!-- Left: command list -->
+                    <ListBox x:Name="CommandSelector" Grid.Column="0"
+                             SelectionChanged="OnCommandSelectionChanged"
+                             DisplayMemberPath="Header" />
 
                     <!-- Splitter -->
                     <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center"
                                   VerticalAlignment="Stretch" />
 
-                    <!-- Right: commands for selected desktop -->
-                    <ListView x:Name="CommandListView" Grid.Column="2"
-                              MouseDoubleClick="OnCommandDoubleClick"
+                    <!-- Right: per-desktop detail for selected command -->
+                    <ListView x:Name="DesktopDetailView" Grid.Column="2"
                               Margin="8,0,0,0"
                               HorizontalContentAlignment="Stretch">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Title" Width="120"
-                                                DisplayMemberBinding="{Binding Title}" />
-                                <GridViewColumn Header="Command Line" Width="300"
+                                <GridViewColumn Header="Desktop" Width="100"
+                                                DisplayMemberBinding="{Binding DesktopName}" />
+                                <GridViewColumn Header="Command Line" Width="280"
                                                 DisplayMemberBinding="{Binding CommandLine}" />
                                 <GridViewColumn Header="Working Directory" Width="150"
                                                 DisplayMemberBinding="{Binding WorkingDirectory}" />
@@ -85,6 +85,7 @@
                     <StackPanel Grid.Row="1" Grid.ColumnSpan="3"
                                 Orientation="Horizontal" Margin="0,8,0,0">
                         <Button Content="+ Add Command" Click="OnAddCommandClick" />
+                        <Button Content="Edit" Click="OnEditCommandClick" Margin="8,0,0,0" />
                         <Button Content="Remove" Click="OnRemoveCommandClick" Margin="8,0,0,0" />
                     </StackPanel>
                 </Grid>
