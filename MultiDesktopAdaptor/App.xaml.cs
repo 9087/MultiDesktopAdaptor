@@ -48,33 +48,75 @@ public partial class App : Application
         var menu = _trayIcon.ContextMenu;
         menu.Items.Clear();
 
+        // Current desktop indicator
+        try
+        {
+            var currentDesktop = VirtualDesktop.Current;
+            menu.Items.Add(new System.Windows.Controls.MenuItem
+            {
+                Header = $"Desktop: {currentDesktop.Name}",
+                IsEnabled = false
+            });
+            menu.Items.Add(new System.Windows.Controls.Separator());
+        }
+        catch { }
+
         menu.Items.Add(new System.Windows.Controls.MenuItem
         {
             Header = "Show Configuration",
             Command = new RelayCommand(ShowConfigurationWindow)
         });
 
-        // Commands submenu — only show commands configured for this desktop
+        // Commands submenu — all commands with colored status dots
         if (_configuration.Commands.Count > 0)
         {
             var currentDesktopId = VirtualDesktop.Current.Id;
-            var visibleCommands = _configuration.Commands
-                .Where(c => c.DesktopCommands.TryGetValue(currentDesktopId, out var line)
-                            && !string.IsNullOrWhiteSpace(line))
-                .ToList();
+            var commandsMenu = new System.Windows.Controls.MenuItem { Header = "Commands" };
 
-            if (visibleCommands.Count > 0)
+            foreach (var cmd in _configuration.Commands)
             {
-                var commandsMenu = new System.Windows.Controls.MenuItem { Header = "Commands" };
-                foreach (var cmd in visibleCommands)
+                var hasCurrent = cmd.DesktopCommands.TryGetValue(currentDesktopId, out var currentDc)
+                                 && !string.IsNullOrWhiteSpace(currentDc.CommandLine);
+                var hasOther = cmd.DesktopCommands.Any(kv =>
+                    kv.Key != currentDesktopId && !string.IsNullOrWhiteSpace(kv.Value.CommandLine));
+
+                if (!hasCurrent && !hasOther)
+                    continue; // skip commands with no configuration at all
+
+                var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
+                string bullet;
+                System.Windows.Media.Brush color;
+                bool enabled;
+
+                if (hasCurrent)
                 {
-                    var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
-                    var item = new System.Windows.Controls.MenuItem { Header = label };
-                    item.Click += (_, _) => ExecuteCommand(cmd);
-                    commandsMenu.Items.Add(item);
+                    bullet = "\u25CF"; // ● green
+                    color = System.Windows.Media.Brushes.Green;
+                    enabled = true;
                 }
-                menu.Items.Add(commandsMenu);
+                else
+                {
+                    bullet = "\u25CF"; // ● red
+                    color = System.Windows.Media.Brushes.Red;
+                    enabled = false;
+                }
+
+                var item = new System.Windows.Controls.MenuItem
+                {
+                    Header = $"{bullet} {label}",
+                    Foreground = color,
+                    IsEnabled = enabled,
+                    ToolTip = hasCurrent ? currentDc!.CommandLine : null
+                };
+
+                if (enabled)
+                    item.Click += (_, _) => ExecuteCommand(cmd);
+
+                commandsMenu.Items.Add(item);
             }
+
+            if (commandsMenu.Items.Count > 0)
+                menu.Items.Add(commandsMenu);
         }
 
         // Mismatched processes — display only, no kill action
@@ -194,8 +236,8 @@ public partial class App : Application
     public void ExecuteCommand(CommandDefinition command)
     {
         var desktopId = VirtualDesktop.Current.Id;
-        if (!command.DesktopCommands.TryGetValue(desktopId, out var commandLine)
-            || string.IsNullOrWhiteSpace(commandLine))
+        if (!command.DesktopCommands.TryGetValue(desktopId, out var dc)
+            || string.IsNullOrWhiteSpace(dc.CommandLine))
         {
             Logger.Info($"[ExecuteCommand] No command for desktop {desktopId}");
             return;
@@ -203,14 +245,17 @@ public partial class App : Application
 
         try
         {
-            Logger.Info($"[ExecuteCommand] Launching: {commandLine}");
-            Process.Start(new ProcessStartInfo
+            Logger.Info($"[ExecuteCommand] Launching: {dc.CommandLine}");
+            var startInfo = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = $"/c \"{commandLine}\"",
+                Arguments = $"/c \"{dc.CommandLine}\"",
                 UseShellExecute = false,
-                CreateNoWindow = true
-            });
+                CreateNoWindow = !dc.ShowWindow
+            };
+            if (!string.IsNullOrWhiteSpace(dc.WorkingDirectory))
+                startInfo.WorkingDirectory = dc.WorkingDirectory;
+            Process.Start(startInfo);
         }
         catch (Exception ex)
         {
@@ -232,11 +277,11 @@ public partial class App : Application
         var commandTargets = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var cmd in _configuration.Commands)
         {
-            foreach (var (desktopId, commandLine) in cmd.DesktopCommands)
+            foreach (var (desktopId, dc) in cmd.DesktopCommands)
             {
-                if (string.IsNullOrWhiteSpace(commandLine))
+                if (string.IsNullOrWhiteSpace(dc.CommandLine))
                     continue;
-                var exePath = NormalizeExePath(ExtractExePath(commandLine));
+                var exePath = NormalizeExePath(ExtractExePath(dc.CommandLine));
                 if (exePath.Length > 0)
                 {
                     commandTargets[exePath] = desktopId;

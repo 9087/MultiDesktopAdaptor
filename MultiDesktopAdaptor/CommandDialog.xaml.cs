@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Windows;
 using ModernWpf.Controls;
 using MultiDesktopAdaptor.Models;
 using WindowsDesktop;
@@ -44,29 +45,38 @@ public partial class CommandDialog : ContentDialog
         foreach (var row in _desktopRows)
         {
             if (command.DesktopCommands.TryGetValue(row.DesktopId, out var existing))
-                row.CommandLine = existing;
+            {
+                row.CommandLine = existing.CommandLine;
+                row.WorkingDirectory = existing.WorkingDirectory;
+                row.ShowWindow = existing.ShowWindow;
+            }
         }
     }
 
     private void OnPrimaryClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        var desktopCommands = new Dictionary<System.Guid, string>();
+        var desktopCommands = new Dictionary<System.Guid, DesktopCommand>();
 
         foreach (var row in _desktopRows)
         {
-            var line = row.CommandLine.Trim();
-            if (string.IsNullOrWhiteSpace(line))
+            var cmdLine = row.CommandLine.Trim();
+            if (string.IsNullOrWhiteSpace(cmdLine))
                 continue;
 
-            if (!Path.IsPathRooted(line))
+            if (!Path.IsPathRooted(cmdLine))
             {
-                ValidationErrorText.Text = $"Not an absolute path: {line}";
+                ValidationErrorText.Text = $"Not an absolute path: {cmdLine}";
                 ValidationErrorText.Visibility = System.Windows.Visibility.Visible;
                 args.Cancel = true;
                 return;
             }
 
-            desktopCommands[row.DesktopId] = line;
+            desktopCommands[row.DesktopId] = new DesktopCommand
+            {
+                CommandLine = cmdLine,
+                WorkingDirectory = row.WorkingDirectory.Trim(),
+                ShowWindow = row.ShowWindow
+            };
         }
 
         ValidationErrorText.Visibility = System.Windows.Visibility.Collapsed;
@@ -93,6 +103,20 @@ public class DesktopCommandRow : INotifyPropertyChanged
     {
         get => _commandLine;
         set { _commandLine = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CommandLine))); }
+    }
+
+    private string _workingDirectory = "";
+    public string WorkingDirectory
+    {
+        get => _workingDirectory;
+        set { _workingDirectory = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WorkingDirectory))); }
+    }
+
+    private bool _showWindow;
+    public bool ShowWindow
+    {
+        get => _showWindow;
+        set { _showWindow = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowWindow))); }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

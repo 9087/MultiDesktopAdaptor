@@ -1,13 +1,22 @@
 namespace MultiDesktopAdaptor.Models;
 
 /// <summary>
-/// A user-defined command whose command line can differ per virtual desktop.
-/// The command line must be an absolute path; arguments after the path are case-sensitive.
+/// Per-desktop command configuration: command line + working directory.
+/// </summary>
+public class DesktopCommand
+{
+    public string CommandLine { get; set; } = string.Empty;
+    public string WorkingDirectory { get; set; } = string.Empty;
+    public bool ShowWindow { get; set; }
+}
+
+/// <summary>
+/// A user-defined command whose command line and working directory can differ per virtual desktop.
 /// </summary>
 public class CommandDefinition
 {
     public string Title { get; set; } = string.Empty;
-    public Dictionary<Guid, string> DesktopCommands { get; set; } = new();
+    public Dictionary<Guid, DesktopCommand> DesktopCommands { get; set; } = new();
 }
 
 /// <summary>

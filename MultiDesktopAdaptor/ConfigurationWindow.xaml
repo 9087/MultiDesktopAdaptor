@@ -4,8 +4,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         ui:WindowHelper.UseModernWindowStyle="True"
         Title="Multi-Desktop Adaptor - Configuration"
-        Height="500" Width="700"
-        MinHeight="400" MinWidth="600"
+        MinHeight="400" MinWidth="800"
         WindowStartupLocation="CenterScreen">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -46,21 +45,45 @@
 
             <TabItem Header="Commands">
                 <Grid Margin="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*" MinWidth="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <ListView x:Name="CommandListView" MouseDoubleClick="OnCommandDoubleClick">
+
+                    <!-- Left: desktop selector -->
+                    <ListBox x:Name="DesktopSelector" Grid.Column="0"
+                             SelectionChanged="OnDesktopSelectionChanged" />
+
+                    <!-- Splitter -->
+                    <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center"
+                                  VerticalAlignment="Stretch" />
+
+                    <!-- Right: commands for selected desktop -->
+                    <ListView x:Name="CommandListView" Grid.Column="2"
+                              MouseDoubleClick="OnCommandDoubleClick"
+                              Margin="8,0,0,0"
+                              HorizontalContentAlignment="Stretch">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Title" Width="150"
+                                <GridViewColumn Header="Title" Width="120"
                                                 DisplayMemberBinding="{Binding Title}" />
-                                <GridViewColumn Header="Desktops configured" Width="200"
-                                                DisplayMemberBinding="{Binding DesktopCommands.Count}" />
+                                <GridViewColumn Header="Command Line" Width="300"
+                                                DisplayMemberBinding="{Binding CommandLine}" />
+                                <GridViewColumn Header="Working Directory" Width="150"
+                                                DisplayMemberBinding="{Binding WorkingDirectory}" />
+                                <GridViewColumn Header="Console" Width="60"
+                                                DisplayMemberBinding="{Binding ShowWindowText}" />
                             </GridView>
                         </ListView.View>
                     </ListView>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3"
+                                Orientation="Horizontal" Margin="0,8,0,0">
                         <Button Content="+ Add Command" Click="OnAddCommandClick" />
                         <Button Content="Remove" Click="OnRemoveCommandClick" Margin="8,0,0,0" />
                     </StackPanel>

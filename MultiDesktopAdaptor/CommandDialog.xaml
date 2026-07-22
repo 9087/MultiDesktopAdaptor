@@ -6,43 +6,67 @@
         PrimaryButtonText="Save"
         SecondaryButtonText="Cancel"
         DefaultButton="Primary">
-    <Grid Width="480" Margin="0,8,0,0">
+    <Grid Margin="0,8,0,0" MinWidth="700">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MaxHeight="240" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Title (shown in tray menu)" Margin="0,0,0,4" />
-        <TextBox x:Name="TitleTextBox" Grid.Row="1" HorizontalAlignment="Stretch" Margin="0,0,0,12" />
+        <TextBox x:Name="TitleTextBox" Grid.Row="1" HorizontalAlignment="Stretch" Margin="0,0,50,12" />
 
         <TextBlock x:Name="ValidationErrorText" Grid.Row="2"
                    Foreground="Red" Visibility="Collapsed"
                    Margin="0,0,0,8" />
 
-        <TextBlock Grid.Row="3" Text="Per-desktop command lines (absolute paths required):"
-                   Margin="0,0,0,4" />
-        <ItemsControl x:Name="DesktopCommandsList" Grid.Row="4"
-                      HorizontalContentAlignment="Stretch"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Grid Margin="0,0,0,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding DesktopName}"
-                                   VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1"
-                                 HorizontalAlignment="Stretch"
-                                 Text="{Binding CommandLine, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <TextBlock Grid.Row="3" Text="Per-desktop commands:" Margin="0,0,0,4" />
+
+        <!-- Header row -->
+        <Grid Grid.Row="4" Margin="0,0,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="130" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Desktop" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="1" Text="Command Line" FontWeight="SemiBold" Margin="4,0,0,0" />
+            <TextBlock Grid.Column="2" Text="Working Directory" FontWeight="SemiBold" Margin="4,0,0,0" />
+            <TextBlock Grid.Column="3" Text="Console" FontWeight="SemiBold" Margin="4,0,0,0"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="5" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="DesktopCommandsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="130" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding DesktopName}" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                     Text="{Binding CommandLine, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="4,0,0,0" />
+                            <TextBox Grid.Column="2" HorizontalAlignment="Stretch"
+                                     Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="4,0,0,0" />
+                            <CheckBox Grid.Column="3" HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding ShowWindow}"
+                                      Margin="4,0,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </ui:ContentDialog>
