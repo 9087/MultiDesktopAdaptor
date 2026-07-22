@@ -48,15 +48,32 @@ public partial class App : Application
         var menu = _trayIcon.ContextMenu;
         menu.Items.Clear();
 
-        // Current desktop indicator
+        // Current desktop with switch submenu
         try
         {
             var currentDesktop = VirtualDesktop.Current;
-            menu.Items.Add(new System.Windows.Controls.MenuItem
+            var desktopMenu = new System.Windows.Controls.MenuItem
             {
-                Header = $"Desktop: {currentDesktop.Name}",
-                IsEnabled = false
-            });
+                Header = $"Desktop: {currentDesktop.Name}"
+            };
+
+            foreach (var desktop in VirtualDesktop.GetDesktops())
+            {
+                var isCurrent = desktop.Id == currentDesktop.Id;
+                var switchItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = desktop.Name,
+                    IsEnabled = !isCurrent
+                };
+                if (!isCurrent)
+                {
+                    var target = desktop; // capture for closure
+                    switchItem.Click += (_, _) => target.Switch();
+                }
+                desktopMenu.Items.Add(switchItem);
+            }
+
+            menu.Items.Add(desktopMenu);
             menu.Items.Add(new System.Windows.Controls.Separator());
         }
         catch { }
@@ -67,46 +84,107 @@ public partial class App : Application
             Command = new RelayCommand(ShowConfigurationWindow)
         });
 
-        // Commands submenu — all commands with colored status dots
+        // Commands submenu — colored dots reflect actual running process state
         if (_configuration.Commands.Count > 0)
         {
             var currentDesktopId = VirtualDesktop.Current.Id;
             var commandsMenu = new System.Windows.Controls.MenuItem { Header = "Commands" };
 
+            // Scan running processes to determine which command exes are active and on which desktop
+            var runningExeDesktopIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+            EnumWindows((hwnd, _) =>
+            {
+                if (!IsWindowVisible(hwnd)) return true;
+                GetWindowThreadProcessId(hwnd, out var pid);
+                if (pid == 0) return true;
+                try
+                {
+                    using var proc = Process.GetProcessById((int)pid);
+                    var exePath = NormalizeExePath(proc.MainModule?.FileName ?? "");
+                    if (exePath.Length > 0)
+                    {
+                        try
+                        {
+                            var desktop = VirtualDesktop.FromHwnd(hwnd);
+                            if (desktop != null)
+                                runningExeDesktopIds[exePath] = desktop.Id;
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+                return true;
+            }, IntPtr.Zero);
+
             foreach (var cmd in _configuration.Commands)
             {
-                var hasCurrent = cmd.DesktopCommands.TryGetValue(currentDesktopId, out var currentDc)
-                                 && !string.IsNullOrWhiteSpace(currentDc.CommandLine);
-                var hasOther = cmd.DesktopCommands.Any(kv =>
+                var hasConfigured = cmd.DesktopCommands.TryGetValue(currentDesktopId, out var currentDc)
+                                    && !string.IsNullOrWhiteSpace(currentDc.CommandLine);
+                var hasOtherConfigured = cmd.DesktopCommands.Any(kv =>
                     kv.Key != currentDesktopId && !string.IsNullOrWhiteSpace(kv.Value.CommandLine));
 
-                if (!hasCurrent && !hasOther)
-                    continue; // skip commands with no configuration at all
+                if (!hasConfigured && !hasOtherConfigured)
+                    continue;
+
+                // Check if the process is actually running
+                var runningDesktopId = Guid.Empty;
+                if (hasConfigured)
+                {
+                    var exePath = NormalizeExePath(ExtractExePath(currentDc!.CommandLine));
+                    runningExeDesktopIds.TryGetValue(exePath, out runningDesktopId);
+                }
+                else if (hasOtherConfigured)
+                {
+                    foreach (var (desktopId, dc) in cmd.DesktopCommands)
+                    {
+                        if (string.IsNullOrWhiteSpace(dc.CommandLine)) continue;
+                        var exePath = NormalizeExePath(ExtractExePath(dc.CommandLine));
+                        if (runningExeDesktopIds.TryGetValue(exePath, out runningDesktopId))
+                            break;
+                    }
+                }
 
                 var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
+                var isRunningOnCurrent = runningDesktopId == currentDesktopId;
+                var isRunningOnOther = runningDesktopId != Guid.Empty && runningDesktopId != currentDesktopId;
+
                 string bullet;
-                System.Windows.Media.Brush color;
+                System.Windows.Media.Brush dotColor;
                 bool enabled;
 
-                if (hasCurrent)
+                if (isRunningOnCurrent)
                 {
-                    bullet = "\u25CF"; // ● green
-                    color = System.Windows.Media.Brushes.Green;
+                    dotColor = System.Windows.Media.Brushes.Green;
                     enabled = true;
+                }
+                else if (isRunningOnOther)
+                {
+                    dotColor = System.Windows.Media.Brushes.Red;
+                    enabled = false;
                 }
                 else
                 {
-                    bullet = "\u25CF"; // ● red
-                    color = System.Windows.Media.Brushes.Red;
-                    enabled = false;
+                    dotColor = System.Windows.SystemColors.MenuTextBrush;
+                    enabled = hasConfigured;
                 }
+
+                var headerPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+                headerPanel.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = "\u25CF ",
+                    Foreground = dotColor
+                });
+                headerPanel.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = label,
+                    Margin = new System.Windows.Thickness(6, 0, 0, 0)
+                });
 
                 var item = new System.Windows.Controls.MenuItem
                 {
-                    Header = $"{bullet} {label}",
-                    Foreground = color,
+                    Header = headerPanel,
                     IsEnabled = enabled,
-                    ToolTip = hasCurrent ? currentDc!.CommandLine : null
+                    ToolTip = hasConfigured ? currentDc!.CommandLine : null
                 };
 
                 if (enabled)
