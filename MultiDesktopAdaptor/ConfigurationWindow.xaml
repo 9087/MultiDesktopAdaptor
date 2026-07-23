@@ -57,8 +57,7 @@
 
                     <!-- Left: command list -->
                     <ListBox x:Name="CommandSelector" Grid.Column="0"
-                             SelectionChanged="OnCommandSelectionChanged"
-                             DisplayMemberPath="Header" />
+                             SelectionChanged="OnCommandSelectionChanged" />
 
                     <!-- Splitter -->
                     <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center"

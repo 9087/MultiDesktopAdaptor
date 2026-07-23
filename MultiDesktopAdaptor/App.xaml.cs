@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using MultiDesktopAdaptor.Models;
 using MultiDesktopAdaptor.Services;
@@ -37,6 +38,11 @@ public partial class App : Application
         _trayIcon.IconSource = CreateImageSourceFromIcon(SystemIcons.Application);
         _trayIcon.TrayMouseDoubleClick += (_, _) => ShowConfigurationWindow();
 
+        // Periodically clean up dead tracked PIDs
+        var cleanupTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        cleanupTimer.Tick += (_, _) => CleanTrackedPids();
+        cleanupTimer.Start();
+
         RebuildTrayMenu();
     }
 
@@ -47,6 +53,8 @@ public partial class App : Application
 
         var menu = _trayIcon.ContextMenu;
         menu.Items.Clear();
+
+        CleanTrackedPids();
 
         // Current desktop with switch submenu
         try
@@ -92,14 +100,19 @@ public partial class App : Application
 
             // Scan running processes to determine which command exes are active and on which desktop
             var runningExeDesktopIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+            var runningPidDesktopIds = new Dictionary<int, Guid>();
+            var trackedPids = new HashSet<int>();
+            lock (_trackedPids) { trackedPids = new HashSet<int>(_trackedPids); }
+
             EnumWindows((hwnd, _) =>
             {
                 if (!IsWindowVisible(hwnd)) return true;
-                GetWindowThreadProcessId(hwnd, out var pid);
-                if (pid == 0) return true;
+                GetWindowThreadProcessId(hwnd, out var pid32);
+                if (pid32 == 0) return true;
+                var pid = (int)pid32;
                 try
                 {
-                    using var proc = Process.GetProcessById((int)pid);
+                    using var proc = Process.GetProcessById(pid);
                     var exePath = NormalizeExePath(proc.MainModule?.FileName ?? "");
                     if (exePath.Length > 0)
                     {
@@ -107,7 +120,10 @@ public partial class App : Application
                         {
                             var desktop = VirtualDesktop.FromHwnd(hwnd);
                             if (desktop != null)
+                            {
                                 runningExeDesktopIds[exePath] = desktop.Id;
+                                runningPidDesktopIds[pid] = desktop.Id;
+                            }
                         }
                         catch { }
                     }
@@ -126,14 +142,31 @@ public partial class App : Application
                 if (!hasConfigured && !hasOtherConfigured)
                     continue;
 
-                // Check if the process is actually running
+                // Check if the process is actually running (by exe path or tracked PID)
                 var runningDesktopId = Guid.Empty;
+
+                // First attempt: match by exe path
                 if (hasConfigured)
                 {
                     var exePath = NormalizeExePath(ExtractExePath(currentDc!.CommandLine));
                     runningExeDesktopIds.TryGetValue(exePath, out runningDesktopId);
                 }
-                else if (hasOtherConfigured)
+
+                // Second attempt: check tracked PIDs (for BAT/scripts where exe doesn't match)
+                if (runningDesktopId == Guid.Empty)
+                {
+                    foreach (var pid in trackedPids)
+                    {
+                        if (runningPidDesktopIds.TryGetValue(pid, out var desktopId))
+                        {
+                            runningDesktopId = desktopId;
+                            break;
+                        }
+                    }
+                }
+
+                // If still not found, check other desktops' configs
+                if (runningDesktopId == Guid.Empty && hasOtherConfigured)
                 {
                     foreach (var (desktopId, dc) in cmd.DesktopCommands)
                     {
@@ -323,6 +356,7 @@ public partial class App : Application
 
         try
         {
+            CleanTrackedPids();
             Logger.Info($"[ExecuteCommand] Launching: {dc.CommandLine}");
             var startInfo = new ProcessStartInfo
             {
@@ -333,12 +367,35 @@ public partial class App : Application
             };
             if (!string.IsNullOrWhiteSpace(dc.WorkingDirectory))
                 startInfo.WorkingDirectory = dc.WorkingDirectory;
-            Process.Start(startInfo);
+
+            var process = Process.Start(startInfo);
+            if (process != null)
+            {
+                lock (_trackedPids)
+                {
+                    _trackedPids.Add(process.Id);
+                }
+                Logger.Info($"[ExecuteCommand] PID={process.Id} tracked");
+            }
         }
         catch (Exception ex)
         {
             Logger.Error($"[ExecuteCommand] Failed: {ex.Message}");
         }
+    }
+
+    /// <summary>PIDs of processes launched via ExecuteCommand (including cmd.exe wrappers).</summary>
+    private readonly HashSet<int> _trackedPids = new();
+
+    private void CleanTrackedPids()
+    {
+        var dead = new List<int>();
+        foreach (var pid in _trackedPids)
+        {
+            try { using var p = Process.GetProcessById(pid); }
+            catch { dead.Add(pid); }
+        }
+        foreach (var pid in dead) _trackedPids.Remove(pid);
     }
 
     /// <summary>

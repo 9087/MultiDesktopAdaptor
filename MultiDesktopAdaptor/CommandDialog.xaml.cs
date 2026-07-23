@@ -79,6 +79,14 @@ public partial class CommandDialog : ContentDialog
             };
         }
 
+        if (desktopCommands.Count == 0)
+        {
+            ValidationErrorText.Text = "At least one desktop must be configured.";
+            ValidationErrorText.Visibility = System.Windows.Visibility.Visible;
+            args.Cancel = true;
+            return;
+        }
+
         ValidationErrorText.Visibility = System.Windows.Visibility.Collapsed;
         Result = new CommandDefinition
         {
