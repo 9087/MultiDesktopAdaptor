@@ -180,42 +180,11 @@ public partial class App : Application
                 var label = string.IsNullOrWhiteSpace(cmd.Title) ? "(untitled)" : cmd.Title;
                 var isRunningOnCurrent = runningDesktopId == currentDesktopId;
                 var isRunningOnOther = runningDesktopId != Guid.Empty && runningDesktopId != currentDesktopId;
-
-                string bullet;
-                System.Windows.Media.Brush dotColor;
-                bool enabled;
-
-                if (isRunningOnCurrent)
-                {
-                    dotColor = System.Windows.Media.Brushes.Green;
-                    enabled = true;
-                }
-                else if (isRunningOnOther)
-                {
-                    dotColor = System.Windows.Media.Brushes.Red;
-                    enabled = false;
-                }
-                else
-                {
-                    dotColor = System.Windows.SystemColors.MenuTextBrush;
-                    enabled = hasConfigured;
-                }
-
-                var headerPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
-                headerPanel.Children.Add(new System.Windows.Controls.TextBlock
-                {
-                    Text = "\u25CF ",
-                    Foreground = dotColor
-                });
-                headerPanel.Children.Add(new System.Windows.Controls.TextBlock
-                {
-                    Text = label,
-                    Margin = new System.Windows.Thickness(6, 0, 0, 0)
-                });
+                var enabled = isRunningOnCurrent || (!isRunningOnOther && hasConfigured);
 
                 var item = new System.Windows.Controls.MenuItem
                 {
-                    Header = headerPanel,
+                    Header = label,
                     IsEnabled = enabled,
                     ToolTip = hasConfigured ? currentDc!.CommandLine : null
                 };
