@@ -47,6 +47,7 @@ public partial class CommandDialog : ContentDialog
             if (command.DesktopCommands.TryGetValue(row.DesktopId, out var existing))
             {
                 row.CommandLine = existing.CommandLine;
+                row.Arguments = existing.Arguments;
                 row.WorkingDirectory = existing.WorkingDirectory;
                 row.ShowWindow = existing.ShowWindow;
             }
@@ -74,6 +75,7 @@ public partial class CommandDialog : ContentDialog
             desktopCommands[row.DesktopId] = new DesktopCommand
             {
                 CommandLine = cmdLine,
+                Arguments = row.Arguments.Trim(),
                 WorkingDirectory = row.WorkingDirectory.Trim(),
                 ShowWindow = row.ShowWindow
             };
@@ -111,6 +113,13 @@ public class DesktopCommandRow : INotifyPropertyChanged
     {
         get => _commandLine;
         set { _commandLine = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CommandLine))); }
+    }
+
+    private string _arguments = "";
+    public string Arguments
+    {
+        get => _arguments;
+        set { _arguments = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Arguments))); }
     }
 
     private string _workingDirectory = "";

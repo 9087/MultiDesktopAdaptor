@@ -186,7 +186,11 @@ public partial class App : Application
                 {
                     Header = label,
                     IsEnabled = enabled,
-                    ToolTip = hasConfigured ? currentDc!.CommandLine : null
+                    ToolTip = hasConfigured
+                        ? (string.IsNullOrWhiteSpace(currentDc!.Arguments)
+                            ? currentDc.CommandLine
+                            : $"{currentDc.CommandLine} {currentDc.Arguments}")
+                        : null
                 };
 
                 if (enabled)
@@ -326,11 +330,14 @@ public partial class App : Application
         try
         {
             CleanTrackedPids();
-            Logger.Info($"[ExecuteCommand] Launching: {dc.CommandLine}");
+            Logger.Info($"[ExecuteCommand] Launching: {dc.CommandLine} {dc.Arguments}");
+            var fullCommand = string.IsNullOrWhiteSpace(dc.Arguments)
+                ? dc.CommandLine
+                : $"{dc.CommandLine} {dc.Arguments}";
             var startInfo = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = $"/c \"{dc.CommandLine}\"",
+                Arguments = $"/c \"{fullCommand}\"",
                 UseShellExecute = false,
                 CreateNoWindow = !dc.ShowWindow
             };

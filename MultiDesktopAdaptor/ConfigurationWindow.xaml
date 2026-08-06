@@ -69,13 +69,15 @@
                               HorizontalContentAlignment="Stretch">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Desktop" Width="100"
+                                <GridViewColumn Header="Desktop" Width="80"
                                                 DisplayMemberBinding="{Binding DesktopName}" />
-                                <GridViewColumn Header="Command Line" Width="280"
+                                <GridViewColumn Header="Program" Width="220"
                                                 DisplayMemberBinding="{Binding CommandLine}" />
-                                <GridViewColumn Header="Working Directory" Width="150"
+                                <GridViewColumn Header="Arguments" Width="160"
+                                                DisplayMemberBinding="{Binding Arguments}" />
+                                <GridViewColumn Header="Working Dir" Width="130"
                                                 DisplayMemberBinding="{Binding WorkingDirectory}" />
-                                <GridViewColumn Header="Console" Width="60"
+                                <GridViewColumn Header="Console" Width="55"
                                                 DisplayMemberBinding="{Binding ShowWindowText}" />
                             </GridView>
                         </ListView.View>

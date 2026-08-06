@@ -6,6 +6,7 @@ namespace MultiDesktopAdaptor.Models;
 public class DesktopCommand
 {
     public string CommandLine { get; set; } = string.Empty;
+    public string Arguments { get; set; } = string.Empty;
     public string WorkingDirectory { get; set; } = string.Empty;
     public bool ShowWindow { get; set; }
 }

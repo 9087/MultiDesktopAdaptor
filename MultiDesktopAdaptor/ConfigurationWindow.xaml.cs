@@ -80,6 +80,7 @@ public partial class ConfigurationWindow : Window
             {
                 DesktopName = desktop.Name,
                 CommandLine = hasConfig ? dc!.CommandLine : "",
+                Arguments = hasConfig ? dc!.Arguments : "",
                 WorkingDirectory = hasConfig ? dc!.WorkingDirectory : "",
                 ShowWindowText = hasConfig && dc!.ShowWindow ? "Yes" : ""
             });
@@ -162,6 +163,7 @@ public class DesktopDetailRow
 {
     public string DesktopName { get; set; } = "";
     public string CommandLine { get; set; } = "";
+    public string Arguments { get; set; } = "";
     public string WorkingDirectory { get; set; } = "";
     public string ShowWindowText { get; set; } = "";
 }
